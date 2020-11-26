@@ -69,6 +69,7 @@ class Balle:
 
 class Jeu:
     def __init__(self):
+        self.jeu = True
         self.balle = Balle()
         self.raquette = Raquette()
         coor_briques = []
@@ -77,12 +78,15 @@ class Jeu:
                 coor_briques.append((i, j))
         self.briques = [Brique(x, y) for x, y in coor_briques]
         self.vies = 5
+        self.score = 0
 
     def gestion_evenements(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
+                if self.jeu == False:
+                    self.__init__()
+                elif event.button == 1:
                     if self.balle.sur_raquette:
                         self.balle.sur_raquette = False
                         self.balle.vitesse_par_angle(60)
@@ -91,11 +95,15 @@ class Jeu:
         x, y = pygame.mouse.get_pos()
         if self.balle.deplacer(self.raquette):
             self.vies -= 1
+            if self.vies == 0:
+                self.jeu = False
         brique_touche = False
         for brique in self.briques:
             if brique.en_vie():
                 if not brique_touche:
                     brique_touche = brique.collision_balle(self.balle)
+        if brique_touche:
+            self.score += 100
         self.raquette.deplacer(x)
 
     def affichage(self):
@@ -103,9 +111,13 @@ class Jeu:
         texte, rect = myfont.render(f"Vies : {self.vies}", BLANC, size=RAYON_BALLE * 2)
         rect.midright = (XMAX - 2 * RAYON_BALLE, YMIN + 2 * RAYON_BALLE)
         screen.blit(texte, rect)
-        if self.vies == 0:
-            texte, rect = myfont.render("GAME OVER", BLANC, size=100)
-            rect.center = (XMAX // 2, YMAX // 2)
+
+        if not self.jeu:
+            texte, rect = myfont.render("GAME OVER", BLANC, size=10*RAYON_BALLE)
+            rect.center = (XMAX // 2, YMAX // 2 - 5 * RAYON_BALLE)
+            screen.blit(texte, rect)
+            texte, rect = myfont.render(f"SCORE : {self.score}", BLANC, size=8*RAYON_BALLE)
+            rect.center = (XMAX // 2, YMAX // 2 + 5 * RAYON_BALLE)
             screen.blit(texte, rect)
         else:
             self.balle.afficher()
@@ -113,6 +125,9 @@ class Jeu:
             for brique in self.briques:
                 if brique.en_vie():
                     brique.afficher()
+            texte, rect = myfont.render(f"Score : {self.score}", BLANC, size=RAYON_BALLE * 2)
+            rect.midleft = (XMIN + 2 * RAYON_BALLE, YMIN + 2 * RAYON_BALLE)
+            screen.blit(texte, rect)
 
 class Raquette:
     def __init__(self):
@@ -177,8 +192,7 @@ class Brique:
 
 jeu = Jeu()
 
-continuer = True
-while continuer:
+while True:
     jeu.gestion_evenements()
     jeu.mise_a_jour()
     jeu.affichage()
