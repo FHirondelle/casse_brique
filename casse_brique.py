@@ -21,7 +21,7 @@ BLANC = (255, 255, 255)
 NOIR = (0, 0, 0)
 ROUGE = (255, 0, 0)
 VERT = (0, 255, 0)
-BLEU = (0, 0, 255)
+JAUNE = (255, 255, 0)
 
 RAYON_BALLE = 10
 XMIN, YMIN = 0, 0
@@ -38,9 +38,10 @@ class Balle:
         self.vitesse = 8
         self.vitesse_par_angle(random.randint(10, 170))
         self.sur_raquette = True
+        self.couleur = BLANC
 
     def afficher(self):
-        pygame.draw.rect(screen, BLANC, (int(self.x-RAYON_BALLE), int(self.y-RAYON_BALLE),
+        pygame.draw.rect(screen, self.couleur, (int(self.x-RAYON_BALLE), int(self.y-RAYON_BALLE),
                                          2 * RAYON_BALLE, 2 * RAYON_BALLE), 0)
 
     def rebond_raquette(self, raquette):
@@ -75,6 +76,8 @@ class Jeu:
     def __init__(self):
         self.jeu = True
         self.balle = Balle()
+        self.balle_deux = Balle()
+        self.balle_bonus = False
         self.raquette = Raquette()
         coor_briques = []
         for i in range(40, 780, 80):
@@ -85,9 +88,23 @@ class Jeu:
         niveau_quatre = [(i, j) for i in range(40, 780, 80) for j in range(50, 230, 50)]
         self.briques = {1: [Brique(420, 140)], 2: [Brique(x, y) for x, y in niveau_deux],
                         3: [Brique(x, y) for x, y in niveau_trois], 4: [Brique(x, y) for x, y in niveau_quatre]}
-        self.vies = 5
+        briques_trois = random.sample(self.briques[3], 2)
+        for brique in self.briques[3]:
+            if brique in briques_trois:
+                brique.vie = 2
+        brique_quatre = random.sample(self.briques[4], 7)
+        for brique in self.briques[4]:
+            if brique in brique_quatre:
+                if brique == brique_quatre[-1]:
+                    brique.vie = 3
+                elif brique == brique_quatre[0]:
+                    brique.bonus = True
+                else:
+                    brique.vie = 2
+        self.vies = 2
         self.score = 0
-        self.niveau = 0
+        self.score_a_augmente = False
+        self.niveau = 1
 
     def gestion_evenements(self):
         for event in pygame.event.get():
@@ -105,6 +122,8 @@ class Jeu:
         if self.jeu:
             x, y = pygame.mouse.get_pos()
             briques = False
+            if self.balle_deux.deplacer(self.raquette):
+                self.balle_bonus = False
             if self.balle.deplacer(self.raquette):
                 self.vies -= 1
                 if self.vies == 0:
@@ -114,14 +133,25 @@ class Jeu:
                 if brique.en_vie():
                     briques = True
                     if not brique_touche:
-                        brique_touche = brique.collision_balle(self.balle)
+                        brique_touche, bonus = brique.collision_balle(self.balle)
+                        if not brique_touche and self.balle_bonus:
+                            brique_touche, bonus = brique.collision_balle(self.balle_deux)
             if brique_touche:
                 self.score += 100
+                self.score_a_augmente = True
+                if bonus:
+                    self.balle_bonus = True
+                    self.balle_deux.sur_raquette = False
+                    self.balle_deux.couleur = JAUNE
             if not briques:
                 self.niveau += 1
                 self.balle.sur_raquette = True
+                balle_bonus = False
                 if self .niveau >= 5:
                     self.jeu = False
+            if self.score_a_augmente and self.score % 2000 == 0:
+                self.vies += 1
+                self.score_a_augmente = False
             self.raquette.deplacer(x)
 
     def affichage(self):
@@ -131,7 +161,7 @@ class Jeu:
                 texte, rect = myfont.render("GAGNÉ !", BLANC, size=10*RAYON_BALLE)
                 rect.center = (XMAX // 2, YMAX // 2 - 5 * RAYON_BALLE)
                 screen.blit(texte, rect)
-                texte, rect = myfont.render(f"SCORE : {self.score}", BLANC, size=8*RAYON_BALLE)
+                texte, rect = myfont.render(f"SCORE : {self.score * self.vies}", BLANC, size=8*RAYON_BALLE)
                 rect.center = (XMAX // 2, YMAX // 2 + 5 * RAYON_BALLE)
                 screen.blit(texte, rect)
             else:
@@ -148,6 +178,8 @@ class Jeu:
             texte, rect = myfont.render(f"NIVEAU {self.niveau}", BLANC, size=RAYON_BALLE*3)
             rect.center = (XMAX // 2, YMIN + 1.5 * RAYON_BALLE)
             screen.blit(texte, rect)
+            if self.balle_bonus:
+                self.balle_deux.afficher()
             self.balle.afficher()
             self.raquette.afficher()
             for brique in self.briques[self.niveau]:
@@ -189,12 +221,18 @@ class Brique:
         self.vie = 1
         self.longueur = 5 * RAYON_BALLE
         self.largeur = 3 * RAYON_BALLE
+        self.bonus = False
 
     def en_vie(self):
         return self.vie > 0
 
     def afficher(self):
-        pygame.draw.rect(screen, BLANC, (int(self.x - self.longueur/2), int(self.y - self.largeur/2),
+        couleurs_vie = {1: BLANC, 2:VERT, 3:ROUGE}
+        if self.bonus == True:
+            couleur = JAUNE
+        else:
+            couleur = couleurs_vie[self.vie]
+        pygame.draw.rect(screen, couleur, (int(self.x - self.longueur/2), int(self.y - self.largeur/2),
                                          self.longueur, self.largeur), 0)
 
     def collision_balle(self, balle):
@@ -220,8 +258,7 @@ class Brique:
 
         if touche:
             self.vie -= 1
-        return touche
-
+        return touche, self.bonus
 
 jeu = Jeu()
 
