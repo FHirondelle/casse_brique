@@ -2,7 +2,7 @@ import random
 import sys
 import pygame
 import pygame.freetype
-import math
+import maths
 
 pygame.init()
 
@@ -38,10 +38,9 @@ class Balle:
         self.vitesse = 8
         self.vitesse_par_angle(random.randint(10, 170))
         self.sur_raquette = True
-        self.couleur = BLANC
 
     def afficher(self):
-        pygame.draw.rect(screen, self.couleur, (int(self.x-RAYON_BALLE), int(self.y-RAYON_BALLE),
+        pygame.draw.rect(screen, BLANC, (int(self.x-RAYON_BALLE), int(self.y-RAYON_BALLE),
                                          2 * RAYON_BALLE, 2 * RAYON_BALLE), 0)
 
     def rebond_raquette(self, raquette):
@@ -75,8 +74,7 @@ class Balle:
 class Jeu:
     def __init__(self):
         self.jeu = True
-        self.balle = Balle()
-        self.balle_deux = Balle()
+        self.balle = [Balle()]
         self.balle_bonus = False
         self.raquette = Raquette()
         coor_briques = []
@@ -114,38 +112,43 @@ class Jeu:
                 if not self.jeu:
                     self.__init__()
                 elif event.button == 1:
-                    if self.balle.sur_raquette:
-                        self.balle.sur_raquette = False
-                        self.balle.vitesse_par_angle(random.randint(10, 170))
+                    for balle in self.balle:
+                        if balle.sur_raquette:
+                            balle.sur_raquette = False
+                            balle.vitesse_par_angle(random.randint(10, 170))
 
     def mise_a_jour(self):
         if self.jeu:
             x, y = pygame.mouse.get_pos()
             briques = False
-            if self.balle_deux.deplacer(self.raquette):
-                self.balle_bonus = False
-            if self.balle.deplacer(self.raquette):
-                self.vies -= 1
-                if self.vies == 0:
-                    self.jeu = False
+            for i in range(len(self.balle)):
+                if self.balle[i-1].deplacer(self.raquette):
+                    if self.balle_bonus:
+                        self.balle.pop(i-1)
+                        if len(self.balle) == 1:
+                            self.balle_bonus = False
+                    else:
+                        self.vies -= 1
+                        if self.vies == 0:
+                            self.jeu = False
             brique_touche = False
             for brique in self.briques[self.niveau]:
                 if brique.en_vie():
                     briques = True
                     if not brique_touche:
-                        brique_touche, bonus = brique.collision_balle(self.balle)
-                        if not brique_touche and self.balle_bonus:
-                            brique_touche, bonus = brique.collision_balle(self.balle_deux)
+                        for balle in self.balle:
+                            brique_touche, bonus = brique.collision_balle(balle)
             if brique_touche:
                 self.score += 100
                 self.score_a_augmente = True
                 if bonus:
                     self.balle_bonus = True
-                    self.balle_deux.sur_raquette = False
-                    self.balle_deux.couleur = JAUNE
+                    self.balle.append(Balle())
+                    self.balle[-1].sur_raquette = False
             if not briques:
                 self.niveau += 1
-                self.balle.sur_raquette = True
+                self.balle = [Balle()]
+                self.balle[0].sur_raquette = True
                 balle_bonus = False
                 if self .niveau >= 5:
                     self.jeu = False
@@ -161,7 +164,7 @@ class Jeu:
                 texte, rect = myfont.render("GAGNÉ !", BLANC, size=10*RAYON_BALLE)
                 rect.center = (XMAX // 2, YMAX // 2 - 5 * RAYON_BALLE)
                 screen.blit(texte, rect)
-                texte, rect = myfont.render(f"SCORE : {self.score * self.vies}", BLANC, size=8*RAYON_BALLE)
+                texte, rect = myfont.render(f"SCORE : {self.score}", BLANC, size=8*RAYON_BALLE)
                 rect.center = (XMAX // 2, YMAX // 2 + 5 * RAYON_BALLE)
                 screen.blit(texte, rect)
             else:
@@ -178,9 +181,8 @@ class Jeu:
             texte, rect = myfont.render(f"NIVEAU {self.niveau}", BLANC, size=RAYON_BALLE*3)
             rect.center = (XMAX // 2, YMIN + 1.5 * RAYON_BALLE)
             screen.blit(texte, rect)
-            if self.balle_bonus:
-                self.balle_deux.afficher()
-            self.balle.afficher()
+            for balle in self.balle:
+                balle.afficher()
             self.raquette.afficher()
             for brique in self.briques[self.niveau]:
                 if brique.en_vie():
